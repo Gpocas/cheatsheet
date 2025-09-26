@@ -1,0 +1,71 @@
+HOST := "nocarbon"
+RSYNC_PATH := "~/"
+APP_PATH := "~/nocarbon"
+
+set dotenv-load := true
+set tempdir := "/tmp"
+
+
+default:
+  just --list
+
+format:
+  uv run ruff format
+  uv run ruff check --fix
+
+makemigrate:
+  uv run piccolo migrations new home --auto
+
+migrate:
+  uv run piccolo migrations forwards all
+
+services:
+  docker compose --env-file .env.local down
+  docker compose --env-file .env.local up postgres redis -d
+
+dev:
+  uv run litestar run -r --host 0.0.0.0 --port 8000
+
+serve:
+  uv run litestar run --host 0.0.0.0 --port 8000 --wc 4
+
+admin:
+  uv run uvicorn admin:app --port 8001
+
+seed:
+  #!/usr/bin/env bash
+  docker exec -it nocarbon_postgres sh -c \
+  'psql \
+  -U $POSTGRES_USER \
+  -d $POSTGRES_DB \
+  -f /docker-entrypoint-initdb.d/fn_calc.sql'
+
+celery:
+  #!/usr/bin/env bash
+  PYTHONPATH=$(pwd) uv run celery -A jobs.celery worker --loglevel=info
+
+docker-run:
+  docker compose --env-file .env.prod down
+  docker compose --env-file .env.prod up -d
+
+docker-build:
+  docker compose --env-file .env.prod down
+  docker compose --env-file .env.prod up -d --build
+
+
+rsync:
+  #!/usr/bin/env bash
+  rsync \
+  -avz \
+  --progress \
+  --filter=':- .gitignore' \
+  $(pwd) \
+  {{HOST}}:{{RSYNC_PATH}}
+
+
+deploy: rsync
+  @ssh {{HOST}} \
+  'export PATH=~/.local/bin:$PATH && \
+  export GID=$(id -g) && \
+  cd {{APP_PATH}} && \
+  just docker-build'
