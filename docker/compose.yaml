@@ -1,7 +1,7 @@
 services :
   postgres:
     container_name: nocarbon_postgres
-    image: postgres:17
+    image: postgres:17.7-alpine
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -105,14 +105,14 @@ services :
 
 
   nginx:
-    image: nginx:1.27
+    image: nginx:1.28-alpine
     container_name: nginx
     restart: unless-stopped
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/logs:/var/log/nginx
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+      - certbot:/var/www/certbot
     depends_on:
       - api
     ports:
@@ -125,10 +125,13 @@ services :
     depends_on:
       - nginx
     volumes:
-      - ./certbot/conf:/etc/letsencrypt:rw
-      - ./certbot/www:/var/www/certbot:rw
+      - letsencrypt:/etc/letsencrypt
+      - certbot:/var/www/certbot
     entrypoint: ["sleep", "infinity"]
 
 volumes:
   pg-data:
   redis_data:
+  letsencrypt:
+  certbot:
+    
